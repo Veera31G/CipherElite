@@ -27,7 +27,7 @@ from plugins.bot import add_handler
 
 # When True, `.gcast mylist` and `.gcast to` only send to broadcast channels;
 # groups, supergroups and private users are skipped. Set False to allow them.
-CHANNELS_ONLY = True
+CHANNELS_ONLY = False
 
 # Chats used by `.gcast mylist`. IDs in Telegram Web style (-1505914159) are
 # converted to the full -100... form automatically. Edit this list as needed.
