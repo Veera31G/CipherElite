@@ -48,6 +48,19 @@ async def register_commands():
                 'total': 0
             }
             
+        @staticmethod
+        def is_admin(entity):
+            """True if the account created the chat or is an admin in it.
+            For broadcast channels, also require the right to post."""
+            if getattr(entity, "creator", False):
+                return True
+            rights = getattr(entity, "admin_rights", None)
+            if not rights:
+                return False
+            if isinstance(entity, Channel) and entity.broadcast:
+                return bool(rights.post_messages)
+            return True
+
         async def get_target_chats(self, client, target_type):
             """Get list of target chats based on type"""
             target_chats = []
@@ -59,6 +72,9 @@ async def register_commands():
                     target_chats.append(entity)
                 elif target_type == "groups":
                     if isinstance(entity, (Chat, Channel)) and not entity.broadcast:
+                        target_chats.append(entity)
+                elif target_type == "admin":
+                    if isinstance(entity, (Chat, Channel)) and self.is_admin(entity):
                         target_chats.append(entity)
                 elif target_type == "users":
                     if isinstance(entity, User) and not entity.bot:
@@ -80,7 +96,7 @@ async def register_commands():
                         if message.text:
                             await client.send_message(chat, message.text)
                         elif message.media:
-                            await client.send_file(chat, message.media, caption=message.caption or "")
+                            await client.send_file(chat, message.media, caption=message.text or "")
                     
                     self.broadcast_stats['sent'] += 1
                     
@@ -97,7 +113,7 @@ async def register_commands():
                         )
                     
                     # Small delay to avoid rate limiting
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(1.0)
                     
                 except Exception as e:
                     self.broadcast_stats['failed'] += 1
@@ -119,6 +135,7 @@ async def register_commands():
                                 "• `.gcast all` - Broadcast to all chats\n"
                                 "• `.gcast groups` - Broadcast to groups only\n"
                                 "• `.gcast users` - Broadcast to users only\n"
+                                "• `.gcast admin` - Chats where you are admin\n"
                                 "• `.gcast all copy` - Copy without forward tag\n\n"
                                 "🤖 **Powered by Cipher Elite**")
                 return
@@ -127,18 +144,19 @@ async def register_commands():
             args = event.pattern_match.group(1).split()
             
             if not args:
-                await event.reply("❌ **Cipher Elite Error:** Please specify target (all/groups/users)")
+                await event.reply("❌ **Cipher Elite Error:** Please specify target (all/groups/users/admin)")
                 return
             
             target_type = args[0].lower()
             
-            if target_type not in ["all", "groups", "users"]:
+            if target_type not in ["all", "groups", "users", "admin"]:
                 await event.reply("🎭 **Cipher Elite Broadcast Error**\n\n"
                                 "❌ **Invalid target type!**\n\n"
                                 "**Valid targets:**\n"
                                 "• `all` - All chats\n"
                                 "• `groups` - Groups only\n"
-                                "• `users` - Users only\n\n"
+                                "• `users` - Users only\n"
+                                "• `admin` - Chats where you are admin\n\n"
                                 "**Example:** `.gcast groups copy`")
                 return
             
