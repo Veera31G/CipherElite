@@ -71,7 +71,8 @@ async def register_commands():
                 if target_type == "all":
                     target_chats.append(entity)
                 elif target_type == "groups":
-                    if isinstance(entity, (Chat, Channel)) and not entity.broadcast:
+                    # Basic groups (Chat) have no .broadcast attribute; only Channel does
+                    if isinstance(entity, Chat) or (isinstance(entity, Channel) and not entity.broadcast):
                         target_chats.append(entity)
                 elif target_type == "admin":
                     if isinstance(entity, (Chat, Channel)) and self.is_admin(entity):
