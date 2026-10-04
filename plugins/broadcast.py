@@ -139,6 +139,7 @@ async def register_commands():
             Returns (found, missing, skipped)."""
             await client.get_dialogs()  # fills Telethon's entity cache
             found, missing, skipped, seen = [], [], [], set()
+            self.resolve_errors = {}
             for ref in refs:
                 ref = str(ref).strip()
                 candidates = []
@@ -154,12 +155,14 @@ async def register_commands():
                     try:
                         entity = await client.get_entity(cand)
                         break
-                    except Exception:
+                    except Exception as e:
+                        self.resolve_errors[ref] = type(e).__name__
                         continue
                 if entity is None:
                     missing.append(ref)
                 elif CHANNELS_ONLY and not (isinstance(entity, Channel) and entity.broadcast):
-                    skipped.append(ref)
+                    kind = "group/supergroup" if isinstance(entity, (Chat, Channel)) else "user/bot"
+                    skipped.append(f"{ref} ({kind})")
                 else:
                     key = (type(entity).__name__, entity.id)
                     if key not in seen:
@@ -303,9 +306,17 @@ async def register_commands():
                 target_chats = await broadcast_engine.get_target_chats(event.client, target_type)
             
             if not target_chats:
+                detail = ""
+                if skipped:
+                    detail += "⏭️ **Skipped, not a channel:** " + ", ".join(skipped[:15]) + "\n"
+                if unresolved:
+                    errs = getattr(broadcast_engine, "resolve_errors", {})
+                    detail += "⚠️ **Not found:** " + ", ".join(
+                        f"{u} ({errs[u]})" if u in errs else u for u in unresolved[:15]) + "\n"
                 await status_msg.edit("🎭 **Cipher Elite Broadcast Result**\n\n"
                                      f"❌ **No target chats found for type:** {target_type}\n"
-                                     f"💡 **Make sure you have chats of this type**")
+                                     + detail +
+                                     "💡 **Check the IDs/usernames, membership, and CHANNELS_ONLY**")
                 return
             
             await status_msg.edit(f"🎭 **Cipher Elite Broadcasting**\n\n"
@@ -348,7 +359,9 @@ async def register_commands():
             if skipped:
                 result_msg += f"⏭️ **Skipped, not a channel ({len(skipped)}):** " + ", ".join(skipped[:15]) + "\n\n"
             if unresolved:
-                result_msg += f"⚠️ **Not found ({len(unresolved)}):** " + ", ".join(unresolved[:15]) + "\n\n"
+                errs = getattr(broadcast_engine, "resolve_errors", {})
+                result_msg += f"⚠️ **Not found ({len(unresolved)}):** " + ", ".join(
+                    f"{u} ({errs[u]})" if u in errs else u for u in unresolved[:15]) + "\n\n"
             if stats.get('errors'):
                 result_msg += f"❌ **Failed in:** " + ", ".join(stats['errors'][:15]) + "\n\n"
             result_msg += f"🤖 **Powered by Cipher Elite**"
